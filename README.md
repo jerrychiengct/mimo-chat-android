@@ -1,11 +1,17 @@
-# Mimo Chat 1.1 — online companion preview
+# Mimo Chat 1.2 — companion customisation preview
 
 Native Kotlin/Jetpack Compose character chat, with every conversational reply generated through OpenRouter. No offline responder and no scripted greeting are inserted into chats.
+
+![Mimo Chat icon](docs/mimo-icon.svg)
+
+Original conversation-bubble identity, with an adaptive launcher icon and Android themed-icon support. See [design decisions and research](docs/DESIGN_DIRECTION.md).
 
 ## Included
 
 - Android 8.0+; targets Android 16/API 36; adaptive phone/tablet/foldable layouts.
 - Uploaded local portraits with EXIF orientation handling, centre cropping and bounded image size. No broad media permission; portraits are not sent to the model. Unreferenced portraits are cleaned up on save/delete, editor dismissal and restart.
+- Four editable personality presets: attentive companion, caring partner, playful partner and storyteller. Custom conversation style and per-bot OpenRouter model assignment; model switches keep the same histories and memories.
+- Refreshed companion library and empty-chat introduction with optional draft starters. Free-only model filter and honest connection-needed status.
 - Editable character gender, species, portrait style, adult character age, personality and example dialogue.
 - Companion and Roleplay modes with separate histories and confirmed memories for each character.
 - Streaming replies, stop, retry and discard controls. Failed/interrupted replies are not recorded as completed assistant messages. User messages survive a restart for retry.
@@ -25,7 +31,7 @@ Open this repository in Android Studio with Java 17 and Android SDK 36. Sync and
 gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
 ```
 
-Open Settings, enter your own OpenRouter key, load the model catalogue, choose a model and save. Every message sends relevant history and memory to OpenRouter and its provider. Provider retention/training policies vary. Use a fixed model for a more consistent character voice; `openrouter/free` is an automatic router and can change models.
+Open Settings, enter your own OpenRouter key, load the model catalogue, choose a default model and save. Open Bots to create or edit a companion, apply a personality preset and choose its own model if desired. Blank bot model assignments follow the default; free models are subject to provider availability and request limits. Every message sends relevant history and memory to OpenRouter and its provider. Provider retention/training policies vary. Use a fixed model for a more consistent character voice; `openrouter/free` is an automatic router and can change models.
 
 ## Memory limits and privacy
 

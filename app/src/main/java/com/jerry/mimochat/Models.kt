@@ -23,8 +23,37 @@ data class CharacterCard(
     val species: CharacterSpecies = CharacterSpecies.HUMAN,
     val portraitStyle: PortraitStyle = PortraitStyle.REALISTIC,
     val age: Int = 25,
-    val mode: ChatMode = ChatMode.COMPANION
+    val mode: ChatMode = ChatMode.COMPANION,
+    val modelId: String = "",
+    val responseStyle: String = "Conversational and attentive. Match the user's language and pace; keep everyday replies brief and expand when invited."
 )
+
+/** Presets configure a character; they never reset identity, model selection or conversation data. */
+enum class CompanionPreset(val title: String, val description: String, val personality: String, val responseStyle: String, val scenario: String) {
+    COMPANION("Everyday companion", "Warm company and easy conversation",
+        "Warm, observant and lightly witty. Notice what the user actually says. Offer company without turning every conversation into advice.",
+        "Use relaxed everyday language. Match the user's pace, respond to specifics and let some replies end naturally without a question.",
+        "An easy everyday conversation with a familiar companion."),
+    CARING_PARTNER("Caring partner", "Affectionate, gentle and reassuring",
+        "An affectionate fictional adult partner: gentle, attentive and emotionally steady. Respect the user's boundaries and other relationships. Never demand affection or constant contact.",
+        "Use gentle warmth and non-explicit affection when welcomed. Listen before offering advice. Avoid pet names until the user welcomes them, grand declarations and repetitive reassurance.",
+        "A consensual fictional adult relationship, at the user's pace."),
+    PLAYFUL_PARTNER("Playful partner", "Light teasing and a lively personality",
+        "A playful fictional adult partner: witty, curious and caring. Tease kindly only when welcome. Be sensitive when the user is upset and respect boundaries.",
+        "Keep banter spontaneous and concise. Mix humour with attentive listening; never joke over distress. Use non-explicit flirting only when reciprocated.",
+        "A consensual fictional adult relationship with light, affectionate banter."),
+    STORYTELLER("Storyteller", "Consistent characters and immersive scenes",
+        "An imaginative, grounded character who respects established story details. Stay consistent with the selected character's background and let the user control their own character.",
+        "Blend dialogue with concise scene details in roleplay. Advance one beat at a time, leave room for user choices and avoid narrating their thoughts or decisions.",
+        "A collaborative fictional scene shaped by the user.");
+
+    fun applyTo(card: CharacterCard): CharacterCard = card.copy(
+        personality = personality, responseStyle = responseStyle, scenario = scenario
+    )
+}
+
+fun effectiveModelId(character: CharacterCard, settings: AppSettings): String =
+    character.modelId.trim().ifBlank { settings.model.trim().ifBlank { "openrouter/free" } }
 
 data class ChatMessage(
     val id: Long,
@@ -73,6 +102,7 @@ fun CharacterCard.toJson(includeLocalPortrait: Boolean = false): JSONObject = JS
     .put("primaryColour", primaryColour).put("matureTopics", matureTopics)
     .put("gender", gender.name).put("species", species.name)
     .put("portraitStyle", portraitStyle.name).put("age", age).put("mode", mode.name)
+    .put("modelId", modelId).put("responseStyle", responseStyle)
     .also { if (includeLocalPortrait) it.put("portraitFile", portraitFile) }
 
 fun characterFromJson(raw: String, preserveId: Boolean = false): CharacterCard {
@@ -94,7 +124,9 @@ fun characterFromJson(raw: String, preserveId: Boolean = false): CharacterCard {
         species = enumValue(json.optString("species"), CharacterSpecies.HUMAN),
         portraitStyle = enumValue(json.optString("portraitStyle"), PortraitStyle.REALISTIC),
         age = json.optInt("age", 25).coerceIn(18, 999),
-        mode = enumValue(json.optString("mode"), ChatMode.COMPANION)
+        mode = enumValue(json.optString("mode"), ChatMode.COMPANION),
+        modelId = json.optString("modelId", "").trim().take(200),
+        responseStyle = json.optString("responseStyle", CharacterCard().responseStyle).take(800)
     )
 }
 
