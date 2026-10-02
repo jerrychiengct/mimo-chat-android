@@ -18,10 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-val Purple = Color(0xFF7255F5)
+val Purple = Color(0xFF6356D9)
 val Mint = Color(0xFF9AF5D0)
 val Ink = Color(0xFF17151F)
-val CanvasBackground = Color(0xFFF7F8FC)
+val CanvasBackground = Color(0xFFF5F4FA)
 val Night = Color(0xFF111116)
 
 class MainActivity : ComponentActivity() {
@@ -37,12 +37,14 @@ fun MimoApp(vm: ChatViewModel = viewModel()) {
     val colours = if (vm.settings.darkMode) {
         darkColorScheme(
             primary = Color(0xFFA997FF), secondary = Mint, background = Night,
-            surface = Color(0xFF1B1A22), onBackground = Color(0xFFF2EFFA), onSurface = Color(0xFFF2EFFA)
+            surface = Color(0xFF1B1A22), onBackground = Color(0xFFF2EFFA), onSurface = Color(0xFFF2EFFA),
+            primaryContainer = Color(0xFF332B60), onPrimaryContainer = Color(0xFFEAE4FF)
         )
     } else {
         lightColorScheme(
             primary = Purple, secondary = Color(0xFF167C5A), background = CanvasBackground,
-            surface = Color.White, onBackground = Ink, onSurface = Ink
+            surface = Color.White, onBackground = Ink, onSurface = Ink,
+            primaryContainer = Color(0xFFEAE5FF), onPrimaryContainer = Color(0xFF342B66)
         )
     }
 
@@ -57,7 +59,7 @@ fun MimoApp(vm: ChatViewModel = viewModel()) {
                     NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
                         Spacer(Modifier.weight(1f))
                         MimoRailItem(tab == 0, { tab = 0 }, Icons.Default.ChatBubble, "Chat")
-                        MimoRailItem(tab == 1, { tab = 1 }, Icons.Default.Groups, "Characters")
+                        MimoRailItem(tab == 1, { tab = 1 }, Icons.Default.Groups, "Bots")
                         MimoRailItem(tab == 2, { tab = 2 }, Icons.Default.Settings, "Settings")
                         Spacer(Modifier.weight(1f))
                     }
@@ -72,7 +74,7 @@ fun MimoApp(vm: ChatViewModel = viewModel()) {
                     bottomBar = {
                         NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                             NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Default.ChatBubble, null) }, label = { Text("Chat") })
-                            NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Default.Groups, null) }, label = { Text("Characters") })
+                            NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Default.Groups, null) }, label = { Text("Bots") })
                             NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
                         }
                     }
@@ -113,3 +115,4 @@ private fun MimoRailItem(
         label = { Text(label) }
     )
 }
+

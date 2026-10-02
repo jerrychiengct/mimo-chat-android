@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512">
+  <title>Mimo Chat application icon</title>
+  <rect width="108" height="108" rx="25" fill="#6356D9"/>
+  <path fill="white" d="M36 31H72C79 31 83 36 83 43V62C83 70 78 75 70 75H49L36 79V74C29 72 25 68 25 61V44C25 36 29 31 36 31Z"/>
+  <path fill="none" stroke="#6356D9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" d="M38 61V49C38 39 54 39 54 49V60M54 49C54 39 70 39 70 49V61"/>
+  <path fill="#98E8CF" d="M72 29L74 34L79 36L74 38L72 43L70 38L65 36L70 34Z"/>
+</svg>

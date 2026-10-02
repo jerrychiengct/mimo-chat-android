@@ -55,6 +55,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val currentMemories: List<MemoryFact>
         get() = memories.filter { it.characterId == activeCharacter.id && it.mode == activeCharacter.mode }
     val canRetry: Boolean get() = !isTyping && currentMessages.lastOrNull()?.fromUser == true
+    val effectiveModelId: String get() = effectiveModelId(activeCharacter, settings)
 
     init {
         characters += loadCharacters().ifEmpty { starterCharacters() }
@@ -96,7 +97,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val clean = card.copy(name = card.name.trim().ifBlank { "Unnamed character" }.take(40),
             tagline = card.tagline.trim().take(100), personality = card.personality.trim().take(1200),
             scenario = card.scenario.trim().take(1000), greeting = card.greeting.trim().take(500),
-            exampleDialogue = card.exampleDialogue.trim().take(1600), age = card.age.coerceIn(18, 999))
+            exampleDialogue = card.exampleDialogue.trim().take(1600), age = card.age.coerceIn(18, 999),
+            modelId = card.modelId.trim().take(200), responseStyle = card.responseStyle.trim().take(800))
         val index = characters.indexOfFirst { it.id == card.id }
         if (index >= 0) characters[index] = clean else characters += clean
         saveCharacters()
@@ -148,7 +150,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startReply() {
         val character = activeCharacter
-        val requestSettings = settings
+        val requestSettings = settings.copy(model = effectiveModelId(character, settings))
         val history = messages.toList()
         val facts = memories.toList()
         val cachedLimits = runCatching { JSONObject(prefs.getString("modelContextLengths", "{}")) }.getOrDefault(JSONObject())
