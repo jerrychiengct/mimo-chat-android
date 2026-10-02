@@ -61,6 +61,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (characters.none { it.id == activeCharacterId }) activeCharacterId = characters.first().id
         loadConversationState()
         lastId = maxOf(lastId, messages.maxOfOrNull { it.id } ?: 0L)
+        cleanupPortraits()
     }
 
     fun updateSettings(value: AppSettings) {
@@ -99,6 +100,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val index = characters.indexOfFirst { it.id == card.id }
         if (index >= 0) characters[index] = clean else characters += clean
         saveCharacters()
+        cleanupPortraits()
     }
 
     fun duplicateCharacter(card: CharacterCard) = card.copy(id = UUID.randomUUID().toString(), name = "${card.name} copy".take(40))
@@ -112,6 +114,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (activeCharacterId == card.id) selectCharacter(characters.first().id)
         saveCharacters()
         saveConversationState()
+        cleanupPortraits()
     }
 
     /** No local bot messages, including greetings, are inserted into online conversations. */
@@ -148,8 +151,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val requestSettings = settings
         val history = messages.toList()
         val facts = memories.toList()
-        val contextLength = availableModels.firstOrNull { it.id == requestSettings.model }?.contextLength
-            ?.takeIf { it > 0 } ?: 4096
+        val cachedLimits = runCatching { JSONObject(prefs.getString("modelContextLengths", "{}")) }.getOrDefault(JSONObject())
+        val contextLength = ModelContextLimits.resolve(requestSettings.model, availableModels.toList(), cachedLimits)
         val sequence = ++requestSequence
         errorMessage = null
         streamText = ""
@@ -240,6 +243,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 availableModels.clear(); availableModels.addAll(models)
+                prefs.edit().putString("modelContextLengths", ModelContextLimits.toJson(models).toString()).apply()
             } catch (failure: Exception) { modelError = failure.message ?: "Unable to load models." }
             finally { modelLoading = false }
         }
@@ -337,6 +341,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             errorMessage = "Could not save conversation data. Free device storage before continuing."
             false
         }
+    }
+
+    fun cleanupPortraits() {
+        if (storageHealthy) PortraitStore.cleanup(getApplication(), characters.map { it.portraitFile }.toSet())
     }
 
     private fun starterCharacters() = listOf(

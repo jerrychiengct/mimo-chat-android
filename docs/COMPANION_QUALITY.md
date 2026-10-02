@@ -23,7 +23,7 @@ No competitor code was copied. No inside knowledge of Emochi or measured competi
 
 ## Deterministic checks
 
-CI covers character/mode isolation, old user-message retrieval, exclusion of assistant inventions from retrieval, sourced pinned memory, context-budget errors, legacy card import, local portrait-reference restrictions, SSE heartbeats/multi-line payloads, mid-stream errors, interrupted replies and empty replies. Lint and compilation are required as well.
+CI covers character/mode isolation, old user-message retrieval, exclusion of assistant inventions from retrieval, sourced pinned memory, context-budget errors, legacy card import, local portrait-reference restrictions, orphaned-file cleanup, retained model limits across restarts, SSE heartbeats/multi-line payloads, mid-stream errors, interrupted replies and empty replies. Lint and compilation are required as well.
 
 ## Live-model acceptance work (not performed by unit tests)
 

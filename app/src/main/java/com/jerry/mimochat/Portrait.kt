@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -31,7 +33,14 @@ object PortraitStore {
     fun file(context: Context, name: String): File? =
         name.takeIf { it.matches(Regex("[a-f0-9-]+\\.jpg")) }?.let { File(File(context.filesDir, "portraits"), it) }
 
-    suspend fun import(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
+    fun cleanup(context: Context, keep: Set<String>) {
+        PortraitFiles.cleanup(File(context.filesDir, "portraits"), keep)
+    }
+
+    suspend fun import(context: Context, uri: Uri): String {
+        var createdFile: File? = null
+        try {
+            return withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
@@ -62,10 +71,17 @@ object PortraitStore {
         val directory = File(context.filesDir, "portraits").apply { mkdirs() }
         val name = "${UUID.randomUUID()}.jpg"
         val destination = File(directory, name)
+        createdFile = destination
         try {
             destination.outputStream().use { if (!portrait.compress(Bitmap.CompressFormat.JPEG, 90, it)) throw IOException("Could not save the portrait.") }
         } catch (failure: Exception) { destination.delete(); throw failure }
+        currentCoroutineContext().ensureActive()
         name
+            }
+        } catch (failure: Exception) {
+            createdFile?.delete()
+            throw failure
+        }
     }
 }
 

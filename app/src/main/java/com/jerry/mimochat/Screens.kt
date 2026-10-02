@@ -247,6 +247,7 @@ fun CharactersScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onStartCh
             isNew = editing == null,
             canDelete = vm.characters.size > 1,
             onDismiss = { showEditor = false },
+            onCleanupPortraits = vm::cleanupPortraits,
             onSave = { vm.saveCharacter(it); showEditor = false },
             onDuplicate = { vm.saveCharacter(vm.duplicateCharacter(it)); showEditor = false },
             onDelete = { vm.deleteCharacter(it); showEditor = false }
@@ -327,11 +328,13 @@ private fun CharacterEditorSheet(
     isNew: Boolean,
     canDelete: Boolean,
     onDismiss: () -> Unit,
+    onCleanupPortraits: () -> Unit,
     onSave: (CharacterCard) -> Unit,
     onDuplicate: (CharacterCard) -> Unit,
     onDelete: (CharacterCard) -> Unit
 ) {
     var draft by remember(initial.id) { mutableStateOf(initial) }
+    DisposableEffect(initial.id) { onDispose { onCleanupPortraits() } }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var importing by remember { mutableStateOf(false) }

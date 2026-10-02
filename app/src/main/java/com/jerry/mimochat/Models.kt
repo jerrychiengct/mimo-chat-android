@@ -97,3 +97,14 @@ fun characterFromJson(raw: String, preserveId: Boolean = false): CharacterCard {
         mode = enumValue(json.optString("mode"), ChatMode.COMPANION)
     )
 }
+
+/** Cached independently of the volatile catalogue so a restart preserves the model budget. */
+object ModelContextLimits {
+    fun resolve(modelId: String, live: List<OpenRouterModel>, cached: JSONObject): Int =
+        live.firstOrNull { it.id == modelId }?.contextLength?.takeIf { it > 0 }
+            ?: cached.optInt(modelId, 0).takeIf { it > 0 } ?: 4096
+
+    fun toJson(models: List<OpenRouterModel>): JSONObject = JSONObject().also { json ->
+        models.filter { it.contextLength > 0 }.forEach { json.put(it.id, it.contextLength) }
+    }
+}

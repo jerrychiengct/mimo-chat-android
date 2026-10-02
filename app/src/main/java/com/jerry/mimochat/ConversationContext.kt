@@ -44,7 +44,7 @@ object ConversationContextBuilder {
         val confirmed = if (facts.isEmpty()) "" else "\nUSER-CONFIRMED MEMORY (editable; corrections in recent messages win):\n" +
             facts.joinToString("\n") { "- ${it.text.take(500)} [source: ${it.sourceMessageId ?: "user entry"}]" }
         val fixed = base + confirmed
-        val budget = (contextLength.coerceAtLeast(2048) - 900).coerceAtMost(16000)
+        val budget = (contextLength - 900).coerceAtMost(16000)
         require(cost(fixed) + cost(history.last().text) <= budget) {
             "This model's context budget is too small. Shorten the message or character profile, remove memories, or choose a larger-context model."
         }

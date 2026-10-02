@@ -5,14 +5,14 @@ Native Kotlin/Jetpack Compose character chat, with every conversational reply ge
 ## Included
 
 - Android 8.0+; targets Android 16/API 36; adaptive phone/tablet/foldable layouts.
-- Uploaded local portraits with EXIF orientation handling, centre cropping and bounded image size. No broad media permission; portraits are not sent to the model.
+- Uploaded local portraits with EXIF orientation handling, centre cropping and bounded image size. No broad media permission; portraits are not sent to the model. Unreferenced portraits are cleaned up on save/delete, editor dismissal and restart.
 - Editable character gender, species, portrait style, adult character age, personality and example dialogue.
 - Companion and Roleplay modes with separate histories and confirmed memories for each character.
 - Streaming replies, stop, retry and discard controls. Failed/interrupted replies are not recorded as completed assistant messages. User messages survive a restart for retry.
 - Up to 12 user-approved memories per character/mode. Pin a user message, add a fact, correct it or forget it. Edited facts lose the original source link to avoid misleading provenance.
 - Keyword retrieval of relevant older user messages, alongside a contiguous recent conversation and approved memories. No automatic extraction of model-generated claims as facts.
 - Context-aware conversational instructions: listen before advising, varied replies, appropriate follow-ups, acknowledge uncertainty and respect real-world relationships.
-- Searchable live OpenRouter catalogue; explicit model selection; profile/persona, dark theme and optional mild profanity.
+- Searchable live OpenRouter catalogue; model context metadata retained across restarts; explicit model selection; profile/persona, dark theme and optional mild profanity.
 - Android Keystore-encrypted API-key storage with migration from the earlier plaintext preference.
 - Atomic conversation persistence without the old global 400-message truncation; legacy character IDs and available messages migrate into Companion mode.
 - Mimo JSON card import/export, including compatibility with previous Mimo cards. Portrait images are not embedded in exported JSON. This is not yet Character Card V2/PNG interoperability.
