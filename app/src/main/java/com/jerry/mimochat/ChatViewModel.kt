@@ -163,7 +163,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                errorMessage = failure.message ?: "Could not reach OpenRouter. Retry your message."
+                if (sequence == requestSequence) errorMessage = failure.message ?: "Could not reach OpenRouter. Retry your message."
             } finally {
                 if (sequence == requestSequence) {
                     isTyping = false
