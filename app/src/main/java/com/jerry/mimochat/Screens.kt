@@ -1,5 +1,10 @@
 package com.jerry.mimochat
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,10 +47,11 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacters: () -> Unit) {
-    var draft by rememberSaveable { mutableStateOf("") }
+    val character = vm.activeCharacter
+    var draft by rememberSaveable(character.id, character.mode) { mutableStateOf("") }
+    var showMemory by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val focus = LocalFocusManager.current
-    val character = vm.activeCharacter
     val conversation = vm.currentMessages
     val itemCount = conversation.size + if (vm.isTyping) 1 else 0
 
@@ -60,11 +66,7 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
             Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AnimatedPixelAvatar(
-                character = character,
-                motion = if (vm.isTyping) AvatarMotion.TALK else vm.avatarMotion,
-                modifier = Modifier.size(54.dp).clickable(onClick = onOpenCharacters)
-            )
+            CharacterPortrait(character, Modifier.size(54.dp).clickable(onClick = onOpenCharacters))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(character.name, fontWeight = FontWeight.Bold, fontSize = 19.sp)
@@ -72,7 +74,7 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
                     Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF35C889)))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        if (vm.settings.apiKey.isBlank()) "Demo mode" else vm.settings.model,
+                        if (vm.settings.apiKey.isBlank()) "Connect OpenRouter • AI character" else "AI character • ${vm.settings.model}",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.labelMedium,
@@ -80,9 +82,15 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
                     )
                 }
             }
+            IconButton(onClick = { showMemory = true }) { Icon(Icons.Default.Bookmarks, "View and edit memory") }
             IconButton(onClick = onOpenCharacters) { Icon(Icons.Default.SwitchAccount, "Change character") }
         }
 
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ChatMode.entries.forEach { mode ->
+                FilterChip(selected = character.mode == mode, onClick = { vm.setMode(mode) }, label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) })
+            }
+        }
         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .06f))
 
         LazyColumn(
@@ -91,8 +99,14 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(conversation, key = { it.id }) { message -> MessageBubble(message, character) }
-            if (vm.isTyping) item { TypingBubble(character) }
+            if (conversation.isEmpty()) item {
+                Text("Start a conversation with ${character.name}. Every reply is generated online. Memories and history are separate for each mode.", style = MaterialTheme.typography.bodyMedium)
+            }
+            items(conversation, key = { it.id }) { message -> MessageBubble(message, character, onPin = { vm.pinMessage(message) }) }
+            if (vm.isTyping) item {
+                if (vm.streamText.isBlank()) TypingBubble(character)
+                else Text(vm.streamText, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyLarge)
+            }
         }
 
         AnimatedVisibility(vm.errorMessage != null) {
@@ -104,9 +118,13 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
             )
         }
 
+        if (vm.canRetry) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = vm::retry) { Text("Retry reply") }
+            TextButton(onClick = vm::discardUnanswered) { Text("Discard unanswered message") }
+        }
         Surface(color = MaterialTheme.colorScheme.background) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
+                Modifier.fillMaxWidth().imePadding().padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
                 OutlinedTextField(
@@ -118,7 +136,7 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
                     shape = RoundedCornerShape(24.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = {
-                        vm.send(draft); draft = ""; focus.clearFocus()
+                        if (vm.send(draft)) { draft = ""; focus.clearFocus() }
                     }),
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f),
@@ -129,26 +147,27 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
                 )
                 Spacer(Modifier.width(8.dp))
                 FilledIconButton(
-                    onClick = { vm.send(draft); draft = ""; focus.clearFocus() },
-                    enabled = draft.isNotBlank() && !vm.isTyping,
+                    onClick = { if (vm.isTyping) vm.stopGeneration() else if (vm.send(draft)) { draft = ""; focus.clearFocus() } },
+                    enabled = vm.isTyping || (draft.isNotBlank() && !vm.canRetry),
                     modifier = Modifier.size(50.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Purple)
-                ) { Icon(Icons.Default.ArrowUpward, "Send", tint = Color.White) }
+                ) { Icon(if (vm.isTyping) Icons.Default.Stop else Icons.Default.ArrowUpward, if (vm.isTyping) "Stop generation" else "Send", tint = Color.White) }
             }
         }
         }
     }
+    if (showMemory) MemoryDialog(vm) { showMemory = false }
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage, character: CharacterCard) {
+private fun MessageBubble(message: ChatMessage, character: CharacterCard, onPin: () -> Unit) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = if (message.fromUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Bottom
     ) {
         if (!message.fromUser) {
-            AnimatedPixelAvatar(character, AvatarMotion.IDLE, Modifier.size(32.dp))
+            CharacterPortrait(character, Modifier.size(32.dp))
             Spacer(Modifier.width(8.dp))
         }
         Surface(
@@ -159,12 +178,12 @@ private fun MessageBubble(message: ChatMessage, character: CharacterCard) {
             shadowElevation = if (message.fromUser) 0.dp else 1.dp,
             modifier = Modifier.widthIn(max = 560.dp)
         ) {
-            Text(
-                message.text,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                style = MaterialTheme.typography.bodyLarge,
-                lineHeight = 23.sp
-            )
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(message.text, style = MaterialTheme.typography.bodyLarge, lineHeight = 23.sp)
+                if (message.fromUser) TextButton(onClick = onPin, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
+                    Icon(Icons.Default.BookmarkAdd, null, Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Remember", style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
     }
 }
@@ -172,7 +191,7 @@ private fun MessageBubble(message: ChatMessage, character: CharacterCard) {
 @Composable
 private fun TypingBubble(character: CharacterCard) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        AnimatedPixelAvatar(character, AvatarMotion.TALK, Modifier.size(32.dp))
+        CharacterPortrait(character, Modifier.size(32.dp))
         Spacer(Modifier.width(8.dp))
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
             Text("•••", Modifier.padding(horizontal = 18.dp, vertical = 10.dp).alpha(.72f), letterSpacing = 3.sp)
@@ -199,7 +218,7 @@ fun CharactersScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onStartCh
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Your characters", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                        Text("Create a personality and animate its pixel avatar.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
+                        Text("Create a personality and choose its portrait.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
                     }
                     IconButton(onClick = { showImport = true }) { Icon(Icons.Default.FileDownload, "Import character") }
                 }
@@ -228,6 +247,7 @@ fun CharactersScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onStartCh
             isNew = editing == null,
             canDelete = vm.characters.size > 1,
             onDismiss = { showEditor = false },
+            onCleanupPortraits = vm::cleanupPortraits,
             onSave = { vm.saveCharacter(it); showEditor = false },
             onDuplicate = { vm.saveCharacter(vm.duplicateCharacter(it)); showEditor = false },
             onDelete = { vm.deleteCharacter(it); showEditor = false }
@@ -278,7 +298,7 @@ private fun CharacterLibraryCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect)
     ) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            AnimatedPixelAvatar(character, if (active) AvatarMotion.WAVE else AvatarMotion.IDLE, Modifier.size(90.dp))
+            CharacterPortrait(character, Modifier.size(90.dp))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -308,16 +328,29 @@ private fun CharacterEditorSheet(
     isNew: Boolean,
     canDelete: Boolean,
     onDismiss: () -> Unit,
+    onCleanupPortraits: () -> Unit,
     onSave: (CharacterCard) -> Unit,
     onDuplicate: (CharacterCard) -> Unit,
     onDelete: (CharacterCard) -> Unit
 ) {
     var draft by remember(initial.id) { mutableStateOf(initial) }
-    var previewMotion by remember { mutableStateOf(AvatarMotion.IDLE) }
+    DisposableEffect(initial.id) { onDispose { onCleanupPortraits() } }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var importing by remember { mutableStateOf(false) }
+    var portraitError by remember { mutableStateOf<String?>(null) }
+    var showDelete by remember { mutableStateOf(false) }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch {
+            importing = true
+            portraitError = null
+            try { draft = draft.copy(portraitFile = PortraitStore.import(context, uri)) }
+            catch (failure: Exception) { portraitError = failure.message ?: "Could not import portrait." }
+            finally { importing = false }
+        }
+    }
     val clipboard = LocalClipboardManager.current
     val primaryPresets = listOf(0xFF7255F5, 0xFF176B87, 0xFFE94F64, 0xFF118C6F, 0xFFFF8C42, 0xFF2D3142)
-    val skinPresets = listOf(0xFFFFDFC4, 0xFFFFD3B6, 0xFFD9A066, 0xFF8D5524, 0xFF6A3D2B, 0xFFB8C0FF)
-    val accentPresets = listOf(0xFF9AF5D0, 0xFFFFC857, 0xFFFF9CEE, 0xFF75C9FF, 0xFFFFFFFF, 0xFFB8FF5A)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         LazyColumn(
@@ -326,20 +359,26 @@ private fun CharacterEditorSheet(
         ) {
             item {
                 Text(if (isNew) "Create character" else "Edit ${initial.name}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                Text("The same pixel rig animates every design.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
+                Text("Portraits stay on your device and are not sent to the chat model.", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
             }
             item {
-                AnimatedPixelAvatar(draft, previewMotion, Modifier.fillMaxWidth().height(210.dp))
-                Spacer(Modifier.height(10.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    items(AvatarMotion.entries) { motion ->
-                        FilterChip(
-                            selected = previewMotion == motion,
-                            onClick = { previewMotion = motion },
-                            label = { Text(motion.name.lowercase().replaceFirstChar { it.uppercase() }) }
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CharacterPortrait(draft, Modifier.size(100.dp))
+                    Column {
+                        OutlinedButton(onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !importing) { Text(if (importing) "Importing…" else "Upload portrait") }
+                        if (draft.portraitFile.isNotBlank()) TextButton(onClick = { draft = draft.copy(portraitFile = "") }) { Text("Remove portrait") }
                     }
                 }
+                Text("Images are centre-cropped to a square. Exported JSON contains character details without the image.", style = MaterialTheme.typography.bodySmall)
+                portraitError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+            item {
+                ChoiceRow("Gender", CharacterGender.entries.map { it.name }, draft.gender.name) { draft = draft.copy(gender = CharacterGender.valueOf(it)) }
+                ChoiceRow("Species", CharacterSpecies.entries.map { it.name }, draft.species.name) { draft = draft.copy(species = CharacterSpecies.valueOf(it)) }
+                ChoiceRow("Portrait style", PortraitStyle.entries.map { it.name }, draft.portraitStyle.name) { draft = draft.copy(portraitStyle = PortraitStyle.valueOf(it)) }
+                ChoiceRow("Conversation mode", ChatMode.entries.map { it.name }, draft.mode.name) { draft = draft.copy(mode = ChatMode.valueOf(it)) }
+                Text("Character age: ${draft.age}", style = MaterialTheme.typography.labelLarge)
+                Slider(value = draft.age.coerceIn(18, 100).toFloat(), onValueChange = { draft = draft.copy(age = it.toInt()) }, valueRange = 18f..100f, steps = 81)
             }
             item {
                 EditorField("Name", draft.name, 1) { draft = draft.copy(name = it.take(40)) }
@@ -350,31 +389,13 @@ private fun CharacterEditorSheet(
                 Spacer(Modifier.height(10.dp))
                 EditorField("Scenario", draft.scenario, 3) { draft = draft.copy(scenario = it.take(1000)) }
                 Spacer(Modifier.height(10.dp))
-                EditorField("Opening message", draft.greeting, 3) { draft = draft.copy(greeting = it.take(500)) }
+                EditorField("Opening inspiration (generated online)", draft.greeting, 3) { draft = draft.copy(greeting = it.take(500)) }
                 Spacer(Modifier.height(10.dp))
                 EditorField("Example dialogue (optional)", draft.exampleDialogue, 3) { draft = draft.copy(exampleDialogue = it.take(1600)) }
             }
             item {
-                Text("Outfit colour", fontWeight = FontWeight.SemiBold)
-                ColourRow(primaryPresets, draft.primaryColour) { draft = draft.copy(primaryColour = it) }
-                Spacer(Modifier.height(12.dp))
-                Text("Face colour", fontWeight = FontWeight.SemiBold)
-                ColourRow(skinPresets, draft.skinColour) { draft = draft.copy(skinColour = it) }
-                Spacer(Modifier.height(12.dp))
                 Text("Accent colour", fontWeight = FontWeight.SemiBold)
-                ColourRow(accentPresets, draft.accentColour) { draft = draft.copy(accentColour = it) }
-            }
-            item {
-                Text("Accessory", fontWeight = FontWeight.SemiBold)
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    AvatarAccessory.entries.forEach { accessory ->
-                        FilterChip(
-                            selected = draft.accessory == accessory,
-                            onClick = { draft = draft.copy(accessory = accessory) },
-                            label = { Text(accessory.name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }) }
-                        )
-                    }
-                }
+                ColourRow(primaryPresets, draft.primaryColour) { draft = draft.copy(primaryColour = it) }
             }
             item {
                 SettingSwitch(
@@ -386,7 +407,7 @@ private fun CharacterEditorSheet(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onSave(draft) }, modifier = Modifier.weight(1f)) {
+                    Button(onClick = { onSave(draft) }, enabled = !importing, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Save, null); Spacer(Modifier.width(6.dp)); Text("Save")
                     }
                     OutlinedButton(onClick = { clipboard.setText(AnnotatedString(draft.toJson().toString(2))) }) {
@@ -397,15 +418,19 @@ private fun CharacterEditorSheet(
                     }
                 }
                 if (!isNew && canDelete) {
-                    TextButton(onClick = { onDelete(draft) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    TextButton(onClick = { showDelete = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                         Icon(Icons.Default.Delete, null); Spacer(Modifier.width(6.dp)); Text("Delete character")
                     }
                 }
             }
         }
     }
-}
+    if (showDelete) AlertDialog(onDismissRequest = { showDelete = false }, title = { Text("Delete character?") },
+        text = { Text("This deletes this character's conversations and memories in both modes.") },
+        confirmButton = { TextButton(onClick = { onDelete(draft) }) { Text("Delete") } },
+        dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } })
 
+}
 @Composable
 private fun EditorField(label: String, value: String, lines: Int, onChange: (String) -> Unit) {
     OutlinedTextField(
@@ -443,6 +468,7 @@ fun SettingsScreen(vm: ChatViewModel, modifier: Modifier = Modifier) {
     var draft by remember(vm.settings) { mutableStateOf(vm.settings) }
     var showModels by remember { mutableStateOf(false) }
     var keyVisible by rememberSaveable { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val pageGutter = if (maxWidth > 900.dp) (maxWidth - 900.dp) / 2 else 0.dp
@@ -502,7 +528,7 @@ fun SettingsScreen(vm: ChatViewModel, modifier: Modifier = Modifier) {
                 vm.modelError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "The catalogue is loaded live from OpenRouter. Model prices and availability can change.",
+                    "Chats and selected memory are sent to OpenRouter and its model provider. Provider retention policies vary. A fixed model helps maintain a consistent voice; automatic routers may switch models.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f)
                 )
@@ -518,6 +544,8 @@ fun SettingsScreen(vm: ChatViewModel, modifier: Modifier = Modifier) {
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(12.dp))
+                EditorField("User persona (optional)", draft.userPersona, 3) { draft = draft.copy(userPersona = it.take(600)) }
             }
         }
         item {
@@ -543,16 +571,20 @@ fun SettingsScreen(vm: ChatViewModel, modifier: Modifier = Modifier) {
         }
         item {
             OutlinedButton(
-                onClick = vm::clearCurrentChat,
+                onClick = { confirmClear = true },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
             ) {
-                Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text("Clear active conversation")
+                Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text("Clear active mode and memory")
             }
         }
         }
     }
 
+    if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false }, title = { Text("Clear this mode?") },
+        text = { Text("Deletes the active character's messages and pinned memories in this mode. This cannot be undone.") },
+        confirmButton = { TextButton(onClick = { vm.clearCurrentChat(); confirmClear = false }) { Text("Clear") } },
+        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } })
     if (showModels) {
         ModelPickerDialog(
             loading = vm.modelLoading,
@@ -575,8 +607,8 @@ private fun ModelPickerDialog(
     onDismiss: () -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val filtered = remember(models, query) {
-        if (query.isBlank()) models else models.filter { query in it.name || query in it.id }
+    val filtered = remember(models.toList(), query) {
+        if (query.isBlank()) models else models.filter { it.name.contains(query, ignoreCase = true) || it.id.contains(query, ignoreCase = true) }
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -652,4 +684,39 @@ private fun SettingSwitch(title: String, subtitle: String, checked: Boolean, onC
         }
         Spacer(Modifier.width(12.dp)); Switch(checked = checked, onCheckedChange = onChecked)
     }
+}
+
+
+@Composable
+private fun ChoiceRow(title: String, values: List<String>, selected: String, onSelect: (String) -> Unit) {
+    Text(title, fontWeight = FontWeight.SemiBold)
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        values.forEach { value -> FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(value.lowercase().replaceFirstChar { it.uppercase() }) }) }
+    }
+}
+
+@Composable
+private fun MemoryDialog(vm: ChatViewModel, onDismiss: () -> Unit) {
+    var editing by remember { mutableStateOf<MemoryFact?>(null) }
+    var text by remember { mutableStateOf("") }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("${vm.activeCharacter.mode.name.lowercase().replaceFirstChar { it.uppercase() }} memory") },
+        text = {
+            Column {
+                Text("Only facts you pin or enter become confirmed memories. Earlier user messages may also be retrieved when relevant. Recall is not guaranteed.", style = MaterialTheme.typography.bodySmall)
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
+                    items(vm.currentMemories, key = { it.id }) { fact ->
+                        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            Text(fact.text)
+                            Text(if (fact.sourceMessageId != null) "Pinned from message #${fact.sourceMessageId}" else "Entered or corrected by you", style = MaterialTheme.typography.labelSmall)
+                            Row {
+                                TextButton(onClick = { editing = fact; text = fact.text }) { Text("Edit") }
+                                TextButton(onClick = { vm.deleteMemory(fact); if (editing?.id == fact.id) { editing = null; text = "" } }) { Text("Forget") }
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(value = text, onValueChange = { text = it.take(500) }, label = { Text(if (editing == null) "Add a fact" else "Correct memory") }, minLines = 2, maxLines = 4)
+                Button(onClick = { vm.saveMemory(editing, text); editing = null; text = "" }, enabled = text.isNotBlank() && (editing != null || vm.currentMemories.size < 12)) { Text("Save memory") }
+            }
+        }, confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } })
 }

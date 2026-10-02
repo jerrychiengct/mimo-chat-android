@@ -3,9 +3,10 @@ package com.jerry.mimochat
 import org.json.JSONObject
 import java.util.UUID
 
-enum class AvatarAccessory { NONE, CAP, CAT_EARS, ANTENNA, GLASSES }
-
-enum class AvatarMotion { IDLE, TALK, WALK, WAVE, JUMP, HAPPY, SAD, CONFUSED, SLEEPY }
+enum class ChatMode { COMPANION, ROLEPLAY }
+enum class CharacterGender { FEMALE, MALE, UNSPECIFIED }
+enum class CharacterSpecies { HUMAN, ALIEN, OTHER }
+enum class PortraitStyle { REALISTIC, ANIME, OTHER }
 
 data class CharacterCard(
     val id: String = UUID.randomUUID().toString(),
@@ -13,20 +14,32 @@ data class CharacterCard(
     val tagline: String = "A new voice in your pocket",
     val personality: String = "Warm, curious and concise.",
     val scenario: String = "A casual, helpful conversation.",
-    val greeting: String = "Hello! What shall we talk about?",
+    val greeting: String = "",
     val exampleDialogue: String = "",
     val primaryColour: Long = 0xFF7255F5,
-    val skinColour: Long = 0xFFFFD3B6,
-    val accentColour: Long = 0xFF9AF5D0,
-    val accessory: AvatarAccessory = AvatarAccessory.NONE,
-    val matureTopics: Boolean = false
+    val matureTopics: Boolean = false,
+    val portraitFile: String = "",
+    val gender: CharacterGender = CharacterGender.UNSPECIFIED,
+    val species: CharacterSpecies = CharacterSpecies.HUMAN,
+    val portraitStyle: PortraitStyle = PortraitStyle.REALISTIC,
+    val age: Int = 25,
+    val mode: ChatMode = ChatMode.COMPANION
 )
 
 data class ChatMessage(
     val id: Long,
     val characterId: String,
     val fromUser: Boolean,
-    val text: String
+    val text: String,
+    val mode: ChatMode = ChatMode.COMPANION
+)
+
+data class MemoryFact(
+    val id: String = UUID.randomUUID().toString(),
+    val characterId: String,
+    val mode: ChatMode,
+    val text: String,
+    val sourceMessageId: Long? = null
 )
 
 data class AppSettings(
@@ -34,7 +47,8 @@ data class AppSettings(
     val darkMode: Boolean = false,
     val allowMildProfanity: Boolean = false,
     val apiKey: String = "",
-    val model: String = "openrouter/free"
+    val model: String = "openrouter/free",
+    val userPersona: String = ""
 )
 
 data class OpenRouterModel(
@@ -48,37 +62,49 @@ data class OpenRouterModel(
         get() = promptPrice.toDoubleOrNull() == 0.0 && completionPrice.toDoubleOrNull() == 0.0
 }
 
-fun CharacterCard.toJson(): JSONObject = JSONObject()
-    .put("spec", "mimo-character-card-v1")
-    .put("id", id)
-    .put("name", name)
-    .put("tagline", tagline)
-    .put("personality", personality)
-    .put("scenario", scenario)
-    .put("greeting", greeting)
-    .put("exampleDialogue", exampleDialogue)
-    .put("primaryColour", primaryColour)
-    .put("skinColour", skinColour)
-    .put("accentColour", accentColour)
-    .put("accessory", accessory.name)
-    .put("matureTopics", matureTopics)
+inline fun <reified T : Enum<T>> enumValue(raw: String, fallback: T): T =
+    runCatching { enumValueOf<T>(raw) }.getOrDefault(fallback)
 
-fun characterFromJson(raw: String): CharacterCard {
+fun CharacterCard.toJson(includeLocalPortrait: Boolean = false): JSONObject = JSONObject()
+    .put("spec", "mimo-character-card-v2")
+    .put("id", id).put("name", name).put("tagline", tagline)
+    .put("personality", personality).put("scenario", scenario)
+    .put("greeting", greeting).put("exampleDialogue", exampleDialogue)
+    .put("primaryColour", primaryColour).put("matureTopics", matureTopics)
+    .put("gender", gender.name).put("species", species.name)
+    .put("portraitStyle", portraitStyle.name).put("age", age).put("mode", mode.name)
+    .also { if (includeLocalPortrait) it.put("portraitFile", portraitFile) }
+
+fun characterFromJson(raw: String, preserveId: Boolean = false): CharacterCard {
     val json = JSONObject(raw)
     return CharacterCard(
-        id = UUID.randomUUID().toString(),
+        id = if (preserveId) json.optString("id", UUID.randomUUID().toString()) else UUID.randomUUID().toString(),
         name = json.optString("name", "Imported character").take(40),
         tagline = json.optString("tagline", "Imported character").take(100),
         personality = json.optString("personality", "Warm and helpful.").take(1200),
         scenario = json.optString("scenario", "A casual conversation.").take(1000),
-        greeting = json.optString("greeting", "Hello!").take(500),
+        greeting = json.optString("greeting", "").take(500),
         exampleDialogue = json.optString("exampleDialogue", "").take(1600),
         primaryColour = json.optLong("primaryColour", 0xFF7255F5),
-        skinColour = json.optLong("skinColour", 0xFFFFD3B6),
-        accentColour = json.optLong("accentColour", 0xFF9AF5D0),
-        accessory = runCatching {
-            AvatarAccessory.valueOf(json.optString("accessory", AvatarAccessory.NONE.name))
-        }.getOrDefault(AvatarAccessory.NONE),
-        matureTopics = json.optBoolean("matureTopics", false)
+        matureTopics = json.optBoolean("matureTopics", false),
+        portraitFile = if (preserveId) json.optString("portraitFile", "").takeIf {
+            it.matches(Regex("[a-f0-9-]+\\.jpg"))
+        }.orEmpty() else "",
+        gender = enumValue(json.optString("gender"), CharacterGender.UNSPECIFIED),
+        species = enumValue(json.optString("species"), CharacterSpecies.HUMAN),
+        portraitStyle = enumValue(json.optString("portraitStyle"), PortraitStyle.REALISTIC),
+        age = json.optInt("age", 25).coerceIn(18, 999),
+        mode = enumValue(json.optString("mode"), ChatMode.COMPANION)
     )
+}
+
+/** Cached independently of the volatile catalogue so a restart preserves the model budget. */
+object ModelContextLimits {
+    fun resolve(modelId: String, live: List<OpenRouterModel>, cached: JSONObject): Int =
+        live.firstOrNull { it.id == modelId }?.contextLength?.takeIf { it > 0 }
+            ?: cached.optInt(modelId, 0).takeIf { it > 0 } ?: 4096
+
+    fun toJson(models: List<OpenRouterModel>): JSONObject = JSONObject().also { json ->
+        models.filter { it.contextLength > 0 }.forEach { json.put(it.id, it.contextLength) }
+    }
 }

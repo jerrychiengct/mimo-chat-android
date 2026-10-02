@@ -1,61 +1,44 @@
-# Mimo Chat
+# Mimo Chat 1.1 — online companion preview
 
-A customisable native Android character-chat app with OpenRouter model selection and procedural pixel avatars.
-
-## Platform support
-
-- Android 8.0 (API 26) and newer
-- Targets Android 16 (API 36)
-- Edge-to-edge system UI
-- Responsive phone layouts in portrait and landscape
-- Navigation rail and centred content on tablets, foldables and wide windows
-- Adaptive multi-column character library
-- Resizable and multi-window compatible
+Native Kotlin/Jetpack Compose character chat, with every conversational reply generated through OpenRouter. No offline responder and no scripted greeting are inserted into chats.
 
 ## Included
 
-- Kotlin + Jetpack Compose UI
-- Multiple editable character cards with separate conversations
-- Character name, tagline, personality, scenario, greeting and example dialogue
-- Portable JSON character-card import and export
-- Procedural 11×16-inspired pixel character rig
-- Idle, talking, walking, waving, jumping, happy, sad, confused and sleepy animations
-- Custom outfit, face and accent colours
-- Cap, cat-ear, antenna and glasses accessories
-- Optional mature-topic tone for non-explicit adult-life discussions
-- Optional mild profanity tolerance
-- Dark mode
-- Persistent local characters, settings and conversations
-- Offline demo responses
-- OpenRouter chat-completions integration
-- Live searchable OpenRouter model catalogue with free-model badges
-- HTTPS-only network policy and no hard-coded credentials
+- Android 8.0+; targets Android 16/API 36; adaptive phone/tablet/foldable layouts.
+- Uploaded local portraits with EXIF orientation handling, centre cropping and bounded image size. No broad media permission; portraits are not sent to the model. Unreferenced portraits are cleaned up on save/delete, editor dismissal and restart.
+- Editable character gender, species, portrait style, adult character age, personality and example dialogue.
+- Companion and Roleplay modes with separate histories and confirmed memories for each character.
+- Streaming replies, stop, retry and discard controls. Failed/interrupted replies are not recorded as completed assistant messages. User messages survive a restart for retry.
+- Up to 12 user-approved memories per character/mode. Pin a user message, add a fact, correct it or forget it. Edited facts lose the original source link to avoid misleading provenance.
+- Keyword retrieval of relevant older user messages, alongside a contiguous recent conversation and approved memories. No automatic extraction of model-generated claims as facts.
+- Context-aware conversational instructions: listen before advising, varied replies, appropriate follow-ups, acknowledge uncertainty and respect real-world relationships.
+- Searchable live OpenRouter catalogue; model context metadata retained across restarts; explicit model selection; profile/persona, dark theme and optional mild profanity.
+- Android Keystore-encrypted API-key storage with migration from the earlier plaintext preference.
+- Atomic conversation persistence without the old global 400-message truncation; legacy character IDs and available messages migrate into Companion mode.
+- Mimo JSON card import/export, including compatibility with previous Mimo cards. Portrait images are not embedded in exported JSON. This is not yet Character Card V2/PNG interoperability.
 
-## Open in Android Studio
+## Run
 
-1. Open the `MimoChat` folder.
-2. Let Android Studio install/sync the requested Android SDK and Gradle components.
-3. Run the `app` configuration on an Android 8.0+ emulator or device.
+Open this repository in Android Studio with Java 17 and Android SDK 36. Sync and run the `app` configuration. Alternatively, with Gradle 8.13 installed:
 
-The repository also includes a GitHub Actions build. Every push to `main` runs Android lint, builds an installable APK, generates a SHA-256 checksum and attaches both files to the `v1.0.0` GitHub release.
+```sh
+gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
+```
 
-## Connect OpenRouter
+Open Settings, enter your own OpenRouter key, load the model catalogue, choose a model and save. Every message sends relevant history and memory to OpenRouter and its provider. Provider retention/training policies vary. Use a fixed model for a more consistent character voice; `openrouter/free` is an automatic router and can change models.
 
-The project deliberately contains no API key. Open **Settings**, then:
+## Memory limits and privacy
 
-1. Enter an OpenRouter development/testing API key.
-2. Tap **Load model catalogue**.
-3. Search and select any currently available model.
-4. Save the settings.
+Recall is not guaranteed: retrieval is lexical, not semantic, and only selected older messages fit the model context. Corrections in recent messages are instructed to override earlier memory; users can directly correct pinned memory. Nothing here establishes an empirical accuracy score or superiority over another companion app.
 
-Without a key, the app remains usable in offline demo mode.
+The app stores conversations and portraits privately within its app storage; conversation files are not separately encrypted. Android backup is disabled. The encrypted API key stays outside card exports. Do not embed a shared commercial key in the APK. A hosted subscription service needs an authenticated backend, quotas and server-side controls.
 
-## Character cards
+Earlier releases already discarded messages beyond their global cap; this update cannot recover those missing messages. Very large histories currently use a whole-file JSON store and need a database migration before broad commercial scale. Cancelling a stream stops the local request; provider-side generation/billing cancellation is provider-dependent.
 
-Open **Characters → New character**. The editor includes a live animation preview for every supported state. The copy button exports the current card as `mimo-character-card-v1` JSON; the import button in the character library accepts that JSON and assigns it a new local ID.
+Characters are clearly AI. Mature-life discussion and non-explicit romance are supported. Character definitions cannot override the app's boundaries. These prompt instructions are not a substitute for production output evaluation and enforcement.
 
-## Production notes
+## Validation and distribution
 
-Do not distribute an APK that sends a permanent provider key directly from the phone. For production, put the OpenRouter call behind your own authenticated server, then add per-user rate limits, moderation, privacy terms and account deletion.
+CI runs JVM regression tests, Android lint and an APK build for pull requests. It publishes a debug testing APK on main. See `docs/COMPANION_QUALITY.md` for the live-model/device evaluation required before broad release.
 
-Character instructions cannot override the local master safety instruction. Server-side safety controls should remain authoritative.
+Build success verifies compilation and the covered deterministic behaviours, not human-like interaction or device compatibility across every Android phone. Generated debug keys may differ between CI runs: in-place upgrades require the same signing key. Use a persistent private release-signing key for reliable updates; uninstalling an older differently signed build deletes local data.
