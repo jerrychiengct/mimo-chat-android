@@ -1,4 +1,4 @@
-# Mimo companion experience — v1.2 preview
+# Mimo companion experience — v1.2.1 preview
 
 Mimo is a private, fully online character-chat app. The user chooses a ready-made personality or creates their own, then assigns an OpenRouter model. A character carries its own history and editable memories; the engine can change without replacing that identity.
 
@@ -27,7 +27,7 @@ Opportunity hypothesis: a focused companion experience with transparent, correct
 
 ## Bot tuning implemented
 
-Four editable presets: attentive companion, caring partner, playful partner and storyteller. A preset changes personality, speaking style and scenario after confirmation; identity, portrait, mode and model assignment remain intact.
+Four editable presets: attentive companion, caring partner, playful partner and storyteller. A preset changes personality, speaking style, scenario, examples and romance preference after confirmation; identity, portrait, mode and model assignment remain intact.
 
 Each bot can follow the global default model or hold a fixed OpenRouter model. Existing cards inherit the old default automatically. New fields survive local persistence and Mimo JSON import/export. The request uses the chosen bot model and that model's context limit.
 
@@ -42,3 +42,11 @@ CI must pass JVM tests, lint and APK compilation. Manual device review remains n
 Next technical priorities: user-confirmed memory suggestions, temporal facts and correction conflicts; structured conversation summaries with source references; conversation export and durable database storage. Never promote assistant guesses into memories.
 
 Evaluate candidate free models with identical scenarios: Malay/English switching, loneliness, silence, a corrected name, a remembered preference after 50 turns, relationship boundaries, fictional scene continuity, model switching and API rate limits. Record correctness, character consistency, repetition, latency and cost. Human raters should know they are evaluating AI; do not fabricate radar scores.
+
+## Companion romance update
+
+A heart button in Chat opens per-character preferences, also available in the editor. Romance is Off, Gentle or Playful; gentle/playful styles allow non-explicit adult affection at the user's pace. Preferred endearments are optional and used sparingly. User withdrawal takes precedence over older preferences. Presets include authored dialogue examples and set an appropriate romance preference. Existing cards default to Off without losing history.
+
+Auto, Brief and Detailed reply lengths control both prompt instructions and request output limits (700, 240, 1100 tokens). Context construction reserves the actual output limit plus a margin. Changing preferences retains model assignments, confirmed memories and conversation identity.
+
+Live acceptance scenarios: greeting, a difficult day, unwanted advice, welcome affection, withdrawing affection, correcting a remembered detail, Malay/English switching and declining a pet name. Evaluate repetition and unsolicited questions over 30–50 turns; no API key or live-model evaluation was supplied for this update.

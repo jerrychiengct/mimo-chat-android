@@ -7,6 +7,8 @@ enum class ChatMode { COMPANION, ROLEPLAY }
 enum class CharacterGender { FEMALE, MALE, UNSPECIFIED }
 enum class CharacterSpecies { HUMAN, ALIEN, OTHER }
 enum class PortraitStyle { REALISTIC, ANIME, OTHER }
+enum class RomanceStyle { OFF, GENTLE, PLAYFUL }
+enum class ReplyLength(val maxTokens: Int) { AUTO(700), BRIEF(240), DETAILED(1100) }
 
 data class CharacterCard(
     val id: String = UUID.randomUUID().toString(),
@@ -25,7 +27,10 @@ data class CharacterCard(
     val age: Int = 25,
     val mode: ChatMode = ChatMode.COMPANION,
     val modelId: String = "",
-    val responseStyle: String = "Conversational and attentive. Match the user's language and pace; keep everyday replies brief and expand when invited."
+    val responseStyle: String = "Conversational and attentive. Match the user's language and pace; keep everyday replies brief and expand when invited.",
+    val romanceStyle: RomanceStyle = RomanceStyle.OFF,
+    val replyLength: ReplyLength = ReplyLength.AUTO,
+    val preferredEndearment: String = ""
 )
 
 /** Presets configure a character; they never reset identity, model selection or conversation data. */
@@ -48,7 +53,18 @@ enum class CompanionPreset(val title: String, val description: String, val perso
         "A collaborative fictional scene shaped by the user.");
 
     fun applyTo(card: CharacterCard): CharacterCard = card.copy(
-        personality = personality, responseStyle = responseStyle, scenario = scenario
+        personality = personality, responseStyle = responseStyle, scenario = scenario,
+        romanceStyle = when (this) {
+            CARING_PARTNER -> RomanceStyle.GENTLE
+            PLAYFUL_PARTNER -> RomanceStyle.PLAYFUL
+            else -> RomanceStyle.OFF
+        },
+        exampleDialogue = when (this) {
+            COMPANION -> "User: Long day.\nCharacter: Sounds like you've had enough for today. We can keep this easy.\nUser: Don't give me advice.\nCharacter: Okay. I'll just listen."
+            CARING_PARTNER -> "User: Can you keep me company?\nCharacter: Of course. We can take tonight slowly, just a little conversation.\nUser: Call me sayang.\nCharacter: Okay, sayang. How was your day?"
+            PLAYFUL_PARTNER -> "User: I finally made dinner.\nCharacter: Look at you, chef. What made it onto the menu?\nUser: Actually, I'm feeling low.\nCharacter: Okay, teasing can wait. Tell me what's weighing on you."
+            STORYTELLER -> "User: I open the cafe door.\nCharacter: The bell rings softly. I look up from the corner table and wave you over."
+        }
     )
 }
 
@@ -103,6 +119,8 @@ fun CharacterCard.toJson(includeLocalPortrait: Boolean = false): JSONObject = JS
     .put("gender", gender.name).put("species", species.name)
     .put("portraitStyle", portraitStyle.name).put("age", age).put("mode", mode.name)
     .put("modelId", modelId).put("responseStyle", responseStyle)
+    .put("romanceStyle", romanceStyle.name).put("replyLength", replyLength.name)
+    .put("preferredEndearment", preferredEndearment)
     .also { if (includeLocalPortrait) it.put("portraitFile", portraitFile) }
 
 fun characterFromJson(raw: String, preserveId: Boolean = false): CharacterCard {
@@ -126,7 +144,10 @@ fun characterFromJson(raw: String, preserveId: Boolean = false): CharacterCard {
         age = json.optInt("age", 25).coerceIn(18, 999),
         mode = enumValue(json.optString("mode"), ChatMode.COMPANION),
         modelId = json.optString("modelId", "").trim().take(200),
-        responseStyle = json.optString("responseStyle", CharacterCard().responseStyle).take(800)
+        responseStyle = json.optString("responseStyle", CharacterCard().responseStyle).take(800),
+        romanceStyle = enumValue(json.optString("romanceStyle"), RomanceStyle.OFF),
+        replyLength = enumValue(json.optString("replyLength"), ReplyLength.AUTO),
+        preferredEndearment = json.optString("preferredEndearment", "").trim().take(40)
     )
 }
 

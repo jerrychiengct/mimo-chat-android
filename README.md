@@ -1,4 +1,4 @@
-# Mimo Chat 1.2 — companion customisation preview
+# Mimo Chat 1.2.1 — companion customisation preview
 
 Native Kotlin/Jetpack Compose character chat, with every conversational reply generated through OpenRouter. No offline responder and no scripted greeting are inserted into chats.
 
@@ -7,6 +7,9 @@ Native Kotlin/Jetpack Compose character chat, with every conversational reply ge
 Original conversation-bubble identity, with an adaptive launcher icon and Android themed-icon support. See [design decisions and research](docs/DESIGN_DIRECTION.md).
 
 ## Included
+
+- Per-bot romance preferences (Off, Gentle, Playful), optional endearments and Auto/Brief/Detailed reply lengths. Tap the heart in Chat or edit the bot. Partner presets opt into their corresponding style; older cards stay friendly until changed.
+- Dialogue instructions encourage natural phrasing and topic continuity, with authored preset examples. These are instructions to the model, not measured human-like performance.
 
 - Android 8.0+; targets Android 16/API 36; adaptive phone/tablet/foldable layouts.
 - Uploaded local portraits with EXIF orientation handling, centre cropping and bounded image size. No broad media permission; portraits are not sent to the model. Unreferenced portraits are cleaned up on save/delete, editor dismissal and restart.

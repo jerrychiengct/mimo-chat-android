@@ -45,13 +45,13 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk release/MimoChat-v1.2.0.apk
-          sha256sum release/MimoChat-v1.2.0.apk > release/MimoChat-v1.2.0.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk release/MimoChat-v1.2.1.apk
+          sha256sum release/MimoChat-v1.2.1.apk > release/MimoChat-v1.2.1.apk.sha256
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MimoChat-v1.2.0
+          name: MimoChat-v1.2.1
           path: release/*
           if-no-files-found: error
 
@@ -60,9 +60,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v1.2.0 >/dev/null 2>&1; then
-            gh release upload v1.2.0 release/* --clobber
+          if gh release view v1.2.1 >/dev/null 2>&1; then
+            gh release upload v1.2.1 release/* --clobber
           else
-            gh release create v1.2.0 release/* --target "$GITHUB_SHA" --title "Mimo Chat v1.2.0" --notes "Companion customisation preview: refreshed UI and adaptive icon, ready-made personality presets, per-bot OpenRouter models and editable response styles. Debug-signed testing APK; device and live-model evaluation pending."
+            gh release create v1.2.1 release/* --target "$GITHUB_SHA" --title "Mimo Chat v1.2.1" --notes "Companion romance preview: adjustable gentle/playful affection, endearments, reply lengths, natural dialogue and per-bot OpenRouter models. Debug-signed testing APK; device and live-model evaluation pending."
           fi
 

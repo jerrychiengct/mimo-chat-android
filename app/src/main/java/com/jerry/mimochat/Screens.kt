@@ -50,6 +50,7 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
     val character = vm.activeCharacter
     var draft by rememberSaveable(character.id, character.mode) { mutableStateOf("") }
     var showMemory by remember { mutableStateOf(false) }
+    var showCompanionControls by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val focus = LocalFocusManager.current
     val conversation = vm.currentMessages
@@ -83,7 +84,9 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
                 }
             }
             IconButton(onClick = { showMemory = true }) { Icon(Icons.Default.Bookmarks, "View and edit memory") }
-            IconButton(onClick = onOpenCharacters) { Icon(Icons.Default.SwitchAccount, "Change character") }
+            IconButton(onClick = { showCompanionControls = true }, enabled = !vm.isTyping) {
+                Icon(if (character.romanceStyle == RomanceStyle.OFF) Icons.Default.FavoriteBorder else Icons.Default.Favorite, "Companion and romance preferences")
+            }
         }
 
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -172,6 +175,9 @@ fun ChatScreen(vm: ChatViewModel, modifier: Modifier = Modifier, onOpenCharacter
         }
     }
     if (showMemory) MemoryDialog(vm) { showMemory = false }
+    if (showCompanionControls) CompanionPreferencesDialog(character,
+        onSave = { vm.saveCharacter(it); showCompanionControls = false },
+        onDismiss = { showCompanionControls = false })
 }
 
 @Composable
@@ -453,6 +459,9 @@ private fun CharacterEditorSheet(
                 EditorField("Example dialogue (optional)", draft.exampleDialogue, 3) { draft = draft.copy(exampleDialogue = it.take(1600)) }
             }
             item {
+                CompanionControls(draft) { draft = it }
+            }
+            item {
                 Text("AI model for this bot", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(if (draft.modelId.isBlank()) "Following your default: $defaultModel" else draft.modelId,
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 8.dp))
@@ -499,7 +508,7 @@ private fun CharacterEditorSheet(
         onSelect = { draft = draft.copy(modelId = it.id); showModels = false }, onDismiss = { showModels = false })
     pendingPreset?.let { preset ->
         AlertDialog(onDismissRequest = { pendingPreset = null }, title = { Text("Apply ${preset.title}?") },
-            text = { Text("Replaces personality, conversation style and scenario in this draft. Your name, portrait, model and saved conversations stay the same.") },
+            text = { Text("Replaces personality, conversation style, scenario, examples and romance preference in this draft. Your name, portrait, model and saved conversations stay the same.") },
             confirmButton = { TextButton(onClick = { draft = preset.applyTo(draft); pendingPreset = null }) { Text("Apply") } },
             dismissButton = { TextButton(onClick = { pendingPreset = null }) { Text("Cancel") } })
     }
@@ -509,6 +518,40 @@ private fun CharacterEditorSheet(
         dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } })
 
 }
+@Composable
+private fun CompanionControls(draft: CharacterCard, onChange: (CharacterCard) -> Unit) {
+    Text("Companion preferences", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(8.dp))
+    ChoiceRow("Romance", RomanceStyle.entries.map { it.name }, draft.romanceStyle.name) {
+        onChange(draft.copy(romanceStyle = RomanceStyle.valueOf(it)))
+    }
+    Text(when (draft.romanceStyle) {
+        RomanceStyle.OFF -> "Friendly company without flirting."
+        RomanceStyle.GENTLE -> "Tender, non-explicit affection at your pace."
+        RomanceStyle.PLAYFUL -> "Light flirting and kind teasing, when welcome."
+    }, style = MaterialTheme.typography.bodySmall)
+    Spacer(Modifier.height(12.dp))
+    ChoiceRow("Reply length", ReplyLength.entries.map { it.name }, draft.replyLength.name) {
+        onChange(draft.copy(replyLength = ReplyLength.valueOf(it)))
+    }
+    if (draft.romanceStyle != RomanceStyle.OFF) {
+        Spacer(Modifier.height(12.dp))
+        EditorField("Preferred endearment (optional)", draft.preferredEndearment, 1) {
+            onChange(draft.copy(preferredEndearment = it.take(40)))
+        }
+        Text("For example, sayang. Leave blank to let the conversation guide it.", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun CompanionPreferencesDialog(character: CharacterCard, onSave: (CharacterCard) -> Unit, onDismiss: () -> Unit) {
+    var draft by remember(character.id) { mutableStateOf(character) }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("With ${character.name}") },
+        text = { Column { CompanionControls(draft) { draft = it } } },
+        confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+}
+
 @Composable
 private fun EditorField(label: String, value: String, lines: Int, onChange: (String) -> Unit) {
     OutlinedTextField(
