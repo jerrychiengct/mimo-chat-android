@@ -55,6 +55,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val currentMemories: List<MemoryFact>
         get() = memories.filter { it.characterId == activeCharacter.id && it.mode == activeCharacter.mode }
     val canRetry: Boolean get() = !isTyping && currentMessages.lastOrNull()?.fromUser == true
+    val effectiveModelId: String get() = effectiveModelId(activeCharacter, settings)
 
     init {
         characters += loadCharacters().ifEmpty { starterCharacters() }
@@ -96,7 +97,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val clean = card.copy(name = card.name.trim().ifBlank { "Unnamed character" }.take(40),
             tagline = card.tagline.trim().take(100), personality = card.personality.trim().take(1200),
             scenario = card.scenario.trim().take(1000), greeting = card.greeting.trim().take(500),
-            exampleDialogue = card.exampleDialogue.trim().take(1600), age = card.age.coerceIn(18, 999))
+            exampleDialogue = card.exampleDialogue.trim().take(1600), age = card.age.coerceIn(18, 999),
+            modelId = card.modelId.trim().take(200), responseStyle = card.responseStyle.trim().take(800),
+            preferredEndearment = card.preferredEndearment.trim().take(40))
         val index = characters.indexOfFirst { it.id == card.id }
         if (index >= 0) characters[index] = clean else characters += clean
         saveCharacters()
@@ -148,7 +151,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startReply() {
         val character = activeCharacter
-        val requestSettings = settings
+        val requestSettings = settings.copy(model = effectiveModelId(character, settings))
         val history = messages.toList()
         val facts = memories.toList()
         val cachedLimits = runCatching { JSONObject(prefs.getString("modelContextLengths", "{}")) }.getOrDefault(JSONObject())
@@ -253,7 +256,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val history = JSONArray().put(JSONObject().put("role", "system").put("content", context.system))
         context.recent.forEach { history.put(JSONObject().put("role", if (it.fromUser) "user" else "assistant").put("content", it.text)) }
         val body = JSONObject().put("model", requestSettings.model).put("messages", history)
-            .put("temperature", 0.75).put("max_tokens", 700).put("stream", true).toString()
+            .put("temperature", 0.75).put("max_tokens", context.maxTokens).put("stream", true).toString()
             .toRequestBody("application/json".toMediaType())
         val request = Request.Builder().url("https://openrouter.ai/api/v1/chat/completions")
             .addHeader("Authorization", "Bearer ${requestSettings.apiKey}")
